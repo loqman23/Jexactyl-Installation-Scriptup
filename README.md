@@ -5,7 +5,7 @@ A comprehensive installation script for Jexactyl Panel and Wings, developed by l
 ## Quick Install
 
 ```bash
-wget https://raw.githubusercontent.com/loqman23/panel/main/install.sh && bash install.sh
+wget https://raw.githubusercontent.com/loqman23/Jexactyl-Installation-Scriptup/main/install.sh && bash install.sh
 ```
 
 ## Features
