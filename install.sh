@@ -1,3 +1,37 @@
+#!/bin/sh
+
+# Copyright (C) 2023 Thien Tran
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+set -eu
+
+output(){
+    printf '\e[1;34m%-6s\e[m\n' "${@}"
+}
+
+mariadb_root_reset(){
+    rootpassword=$(/dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    Q0="SET old_passwords=0;"
+    Q1="SET PASSWORD FOR root@localhost = PASSWORD('$rootpassword');"
+    Q2="FLUSH PRIVILEGES;"
+    SQL="${Q0}${Q1}${Q2}"
+    mysql mysql -e "$SQL"
+    output "Your MariaDB root password is $rootpassword"
+}
+
+mariadb_root_reset
+
 #!/bin/bash
 
 output(){
@@ -119,18 +153,18 @@ os_check(){
     fi
     
     if [ "$lsb_dist" =  "ubuntu" ]; then
-        if  [ "$dist_version" != "20.04" ]; then
-            output "Unsupported Ubuntu version. Only Ubuntu 20.04 is supported."
+        if  [ "$dist_version" != "20.04" ] && [ "$dist_version" != "22.04" ]; then
+            output "Unsupported Ubuntu version. Only Ubuntu 20.04 and 22.04 are supported."
             exit 2
         fi
     elif [ "$lsb_dist" = "debian" ]; then
         if [ "$dist_version" != "11" ]; then
-            output "Unsupported Debian version. Only Debian 10 is supported."
+            output "Unsupported Debian version. Only Debian 11 is supported."
             exit 2
         fi
     elif [ "$lsb_dist" = "fedora" ]; then
         if [ "$dist_version" != "35" ]; then
-            output "Unsupported Fedora version. Only Fedora 34 is supported."
+            output "Unsupported Fedora version. Only Fedora 35 is supported."
             exit 2
         fi
     elif [ "$lsb_dist" = "centos" ]; then
@@ -157,12 +191,12 @@ os_check(){
         output "Unsupported operating system."
         output ""
         output "Supported OS:"
-        output "Ubuntu: 20.04"
+        output "Ubuntu: 20.04, 22.04"
         output "Debian: 11"
         output "Fedora: 35"
         output "CentOS Stream: 8"
         output "Rocky Linux: 8"
-	output "AlmaLinux: 8"
+        output "AlmaLinux: 8"
         output "RHEL: 8"
         exit 2
     fi
@@ -193,11 +227,11 @@ install_options(){
         4 ) installoption=4
             output "You have selected to upgrade the panel to ${PANEL}."
             ;;
-	5 ) installoption=5
-            output "You have selected to upgrade the daemon to ${DAEMON}."
+        5 ) installoption=5
+            output "You have selected to upgrade the daemon to ${WINGS}."
             ;;
         6 ) installoption=6
-            output "You have selected to upgrade panel to ${PANEL} and daemon to ${DAEMON}."
+            output "You have selected to upgrade panel to ${PANEL} and daemon to ${WINGS}."
             ;;
         7 ) installoption=7
             output "You have selected to install phpMyAdmin."
@@ -247,10 +281,10 @@ repositories_setup(){
         LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
         add-apt-repository ppa:redislabs/redis -y
         apt -y update
-	    curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
+        curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
         if [ "$lsb_dist" =  "ubuntu" ]; then
             LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-	    apt -y install tuned dnsutils
+            apt -y install tuned dnsutils
             tuned-adm profile latency-performance
         elif [ "$lsb_dist" =  "debian" ]; then
             apt-get -y install ca-certificates apt-transport-https
@@ -267,52 +301,34 @@ repositories_setup(){
             apt-get -y install curl
         fi
     elif  [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-    	dnf -y install dnf-utils
+        dnf -y install dnf-utils
         if  [ "$lsb_dist" =  "fedora" ] ; then
             dnf -y install http://rpms.remirepo.net/fedora/remi-release-35.rpm
-	else	
-	    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-	    dnf -y install http://rpms.remirepo.net/enterprise/remi-release-8.rpm
-	fi
-#	dnf config-manager --set-enabled remi
-#        dnf -y install tuned dnf-automatic
-#        tuned-adm profile latency-performance
-#	systemctl enable --now irqbalance
-#	sed -i 's/apply_updates = no/apply_updates = yes/g' /etc/dnf/automatic.conf
-#	systemctl enable --now dnf-automatic.timer
-#        dnf -y upgrade
-#        dnf -y autoremove
-#        dnf -y clean packages
-#        dnf -y install curl bind-utils cronie
+        else    
+            dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+            dnf -y install http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+        fi
     fi
-#    systemctl enable --now fstrim.timer
 }
 
 install_dependencies(){
     output "Installing dependencies..."
     if  [ "$lsb_dist" =  "ubuntu" ] ||  [ "$lsb_dist" =  "debian" ]; then
-        apt -y install php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server
-        curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+        # For Ubuntu 22.04, use PHP 8.1
+        if [ "$dist_version" = "22.04" ]; then
+            apt -y install php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server
+            curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+        else
+            apt -y install php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server
+            curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+        fi
     else
-    	dnf -y module install nginx:mainline/common
-	dnf -y module install php:remi-8.1/common
-	dnf -y module install redis:remi-6.2/common
-	dnf -y module install mariadb:10.5/server
+        dnf -y module install nginx:mainline/common
+        dnf -y module install php:remi-8.1/common
+        dnf -y module install redis:remi-6.2/common
+        dnf -y module install mariadb:10.5/server
         dnf -y install git policycoreutils-python-utils unzip wget expect jq php-mysql php-zip php-bcmath tar composer
     fi
-
-#    output "Enabling Services..."
-#    if [ "$lsb_dist" =  "ubuntu" ] || [ "$lsb_dist" =  "debian" ]; then
-#        systemctl enable --now redis-server
-#        systemctl enable --now php8.1-fpm
-#    elif [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-#        systemctl enable --now redis
-#        systemctl enable --now php-fpm
-#    fi
-#
-#    systemctl enable --now cron
-#    systemctl enable --now mariadb
-#    systemctl enable --now nginx
 }
 
 install_jexactyl() {
@@ -330,9 +346,9 @@ install_jexactyl() {
     mkdir -p /var/www/jexactyl
     cd /var/www/jexactyl || exit
     if [ ${PANEL} = "latest" ]; then
-    	curl -Lo panel.tar.gz https://github.com/jexactyl/jexactyl/releases/latest/download/panel.tar.gz
+        curl -Lo panel.tar.gz https://github.com/jexactyl/jexactyl/releases/latest/download/panel.tar.gz
     else
-    	curl -Lo panel.tar.gz https://github.com/jexactyl/jexactyl/releases/download/${PANEL}/panel.tar.gz
+        curl -Lo panel.tar.gz https://github.com/jexactyl/jexactyl/releases/download/${PANEL}/panel.tar.gz
     fi
     tar -xzvf panel.tar.gz
     chmod -R 755 storage/* bootstrap/cache/
@@ -340,8 +356,6 @@ install_jexactyl() {
     output "Installing Jexactyl..."
  
     cp .env.example .env
-    # Fixed in latest release
-    # sed -i 's/APP_KEY=/APP_KEY=base64:voLfFx5NqSPFiuo1lv077qKsT9oKhIPFDLNl4x0PGqk=/' .env
     php artisan key:generate --force << EOF
 yes
 yes
@@ -358,7 +372,7 @@ EOF
         chown -R www-data:www-data * /var/www/jexactyl
     elif  [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
         chown -R nginx:nginx * /var/www/jexactyl
-	semanage fcontext -a -t httpd_sys_rw_content_t "/var/www/jexactyl/storage(/.*)?"
+        semanage fcontext -a -t httpd_sys_rw_content_t "/var/www/jexactyl/storage(/.*)?"
         restorecon -R /var/www/jexactyl
     fi
 
@@ -412,8 +426,8 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
         setsebool -P httpd_can_network_connect 1
-	setsebool -P httpd_execmem 1
-	setsebool -P httpd_unified 1
+        setsebool -P httpd_execmem 1
+        setsebool -P httpd_unified 1
     fi
     sudo systemctl daemon-reload
     systemctl enable --now pteroq.service
@@ -434,6 +448,13 @@ nginx_config() {
     output "Disabling default configuration..."
     rm -rf /etc/nginx/sites-enabled/default
     output "Configuring Nginx Webserver..."
+
+    # Determine PHP-FPM socket path based on Ubuntu version
+    if [ "$dist_version" = "22.04" ]; then
+        PHP_SOCKET="/run/php/php8.1-fpm.sock"
+    else
+        PHP_SOCKET="/run/php/php8.1-fpm.sock"
+    fi
 
 echo '
 server {
@@ -469,7 +490,7 @@ server {
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
     add_header X-Robots-Tag none;
-    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header Content-Security-Policy "frame-ancestors '\''self'\''";
     add_header X-Frame-Options DENY;
     add_header Referrer-Policy same-origin;
 
@@ -479,7 +500,7 @@ server {
 
     location ~ \.php$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:'"$PHP_SOCKET"';
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
@@ -506,6 +527,9 @@ server {
 nginx_config_redhat(){
     output "Configuring Nginx web server..."
 
+    # Determine PHP-FPM socket path for RHEL-based distros
+    PHP_SOCKET="/var/run/php-fpm/php-fpm.sock"
+
 echo '
 server {
     listen 80;
@@ -540,7 +564,7 @@ server {
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
     add_header X-Robots-Tag none;
-    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header Content-Security-Policy "frame-ancestors '\''self'\''";
     add_header X-Frame-Options DENY;
     add_header Referrer-Policy same-origin;
 
@@ -550,7 +574,7 @@ server {
 
     location ~ \.php$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:'"$PHP_SOCKET"';
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
@@ -603,7 +627,7 @@ webserver_config(){
     elif  [ "$lsb_dist" =  "fedora" ] ||  [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
         php_config
         nginx_config_redhat
-	chown -R nginx:nginx /var/lib/php/session
+        chown -R nginx:nginx /var/lib/php/session
     fi
 }
 
@@ -637,9 +661,9 @@ install_wings() {
     mkdir -p /etc/pterodactyl
     cd /etc/pterodactyl || exit
     if [ ${WINGS} = "latest" ]; then
-    	curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
+        curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
     else
-    	curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/download/${WINGS}/wings_linux_amd64
+        curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/download/${WINGS}/wings_linux_amd64
     fi
     chmod u+x /usr/local/bin/wings
     
@@ -670,19 +694,19 @@ EOF
     output "You should go to your panel and configure the node now."
     output "Do `systemctl start wings` after you have run the auto deployment command."
     if  [ "$lsb_dist" != "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-    	output "------------------------------------------------------------------"
-	output "IMPORTANT NOTICE!!!"
-	output "Since you are on a system with targetted SELinux policies, you should be changing the Daemon Server File Directory from /var/lib/jexactyl/volumes to /var/srv/containers/jexactyl."
-	output "------------------------------------------------------------------"
+        output "------------------------------------------------------------------"
+        output "IMPORTANT NOTICE!!!"
+        output "Since you are on a system with targetted SELinux policies, you should be changing the Daemon Server File Directory from /var/lib/jexactyl/volumes to /var/srv/containers/jexactyl."
+        output "------------------------------------------------------------------"
     fi
 }
 
 
 upgrade_wings(){
     if [ ${WINGS} = "latest" ]; then
-    	curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
+        curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
     else
-    	curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/download/${WINGS}/wings_linux_amd64
+        curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/download/${WINGS}/wings_linux_amd64
     fi
     chmod u+x /usr/local/bin/wings
     systemctl restart wings
@@ -692,17 +716,17 @@ upgrade_wings(){
 install_phpmyadmin(){
     output "Installing phpMyAdmin..."
     if [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-    	dnf -y install phpmyadmin
-	ln -s /usr/share/phpMyAdmin /var/www/jexactyl/public/phpmyadmin
+        dnf -y install phpmyadmin
+        ln -s /usr/share/phpMyAdmin /var/www/jexactyl/public/phpmyadmin
     else
-    	apt -y install phpmyadmin
-	ln -s /usr/share/phpmyadmin /var/www/jexactyl/public/phpmyadmin
+        apt -y install phpmyadmin
+        ln -s /usr/share/phpmyadmin /var/www/jexactyl/public/phpmyadmin
     fi
     cd /var/www/jexactyl/public/phpmyadmin || exit
     SERVER_IP=$(dig +short myip.opendns.com @resolver1.opendns.com -4)
     BOWFISH=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 34 | head -n 1`
     if [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-    	bash -c 'cat > /etc/phpMyAdmin/config.inc.php' <<EOF
+        bash -c 'cat > /etc/phpMyAdmin/config.inc.php' <<EOF
 <?php
 /* Servers configuration */
 \$i = 0;
@@ -728,12 +752,12 @@ install_phpmyadmin(){
 \$cfg['AuthLog'] = syslog
 ?>    
 EOF
-	chmod 755 /etc/phpMyAdmin
-	chmod 644 /etc/phpMyAdmin/config.inc.php
-   	chown -R nginx:nginx /var/www/jexactyl
-	chown -R nginx:nginx /var/lib/phpMyAdmin/temp
+        chmod 755 /etc/phpMyAdmin
+        chmod 644 /etc/phpMyAdmin/config.inc.php
+        chown -R nginx:nginx /var/www/jexactyl
+        chown -R nginx:nginx /var/lib/phpMyAdmin/temp
     elif  [ "$lsb_dist" =  "ubuntu" ] || [ "$lsb_dist" =  "debian" ]; then
-    	bash -c 'cat > /etc/phpmyadmin/config.inc.php' <<EOF
+        bash -c 'cat > /etc/phpmyadmin/config.inc.php' <<EOF
 <?php
 /* Servers configuration */
 \$i = 0;
@@ -759,10 +783,10 @@ EOF
 \$cfg['AuthLog'] = syslog
 ?>    
 EOF
-	chmod 755 /etc/phpmyadmin
-	chmod 644 /etc/phpmyadmin/config.inc.php
-   	chown -R www-data:www-data /var/www/jexactyl
-	chown -R www-data:www-data /var/lib/phpmyadmin/temp
+        chmod 755 /etc/phpmyadmin
+        chmod 644 /etc/phpmyadmin/config.inc.php
+        chown -R www-data:www-data /var/www/jexactyl
+        chown -R www-data:www-data /var/lib/phpmyadmin/temp
     fi
     
     bash -c 'cat > /etc/fail2ban/jail.local' <<-'EOF'
@@ -792,17 +816,17 @@ ssl_certs(){
     if [ "$installoption" = "1" ] || [ "$installoption" = "3" ]; then
         if  [ "$lsb_dist" =  "ubuntu" ] || [ "$lsb_dist" =  "debian" ]; then
             apt-get -y install python3-certbot-nginx
-    	elif [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
+        elif [ "$lsb_dist" =  "fedora" ] || [ "$lsb_dist" =  "centos" ] || [ "$lsb_dist" =  "rhel" ] || [ "$lsb_dist" =  "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
             dnf -y install python3-certbot-nginx
-    	fi
-	certbot --nginx --redirect --no-eff-email --email "$email" --agree-tos -d "$FQDN"
-	setfacl -Rdm u:mysql:rx /etc/letsencrypt
-	setfacl -Rm u:mysql:rx /etc/letsencrypt
-	systemctl restart mariadb
+        fi
+        certbot --nginx --redirect --no-eff-email --email "$email" --agree-tos -d "$FQDN"
+        setfacl -Rdm u:mysql:rx /etc/letsencrypt
+        setfacl -Rm u:mysql:rx /etc/letsencrypt
+        systemctl restart mariadb
     fi
     
     if [ "$installoption" = "2" ]; then
-	certbot certonly --standalone --no-eff-email --email "$email" --agree-tos -d "$FQDN" --non-interactive
+        certbot certonly --standalone --no-eff-email --email "$email" --agree-tos -d "$FQDN" --non-interactive
     fi
     systemctl enable --now certbot.timer
 }
@@ -859,16 +883,16 @@ EOF
             firewall-cmd --permanent --add-service=80/tcp
             firewall-cmd --permanent --add-port=2022/tcp
             firewall-cmd --permanent --add-port=8080/tcp
-	    firewall-cmd --permanent --zone=trusted --change-interface=jexactyl0
-	    firewall-cmd --zone=trusted --add-masquerade --permanent
+            firewall-cmd --permanent --zone=trusted --change-interface=jexactyl0
+            firewall-cmd --zone=trusted --add-masquerade --permanent
         elif [ "$installoption" = "3" ]; then
             firewall-cmd --add-service=http --permanent
             firewall-cmd --add-service=https --permanent 
             firewall-cmd --permanent --add-port=2022/tcp
             firewall-cmd --permanent --add-port=8080/tcp
             firewall-cmd --permanent --add-service=mysql
-	    firewall-cmd --permanent --zone=trusted --change-interface=jexactyl0
-	    firewall-cmd --zone=trusted --add-masquerade --permanent
+            firewall-cmd --permanent --zone=trusted --change-interface=jexactyl0
+            firewall-cmd --zone=trusted --add-masquerade --permanent
         fi
     fi
 }
@@ -923,14 +947,14 @@ case $installoption in
     1)  repositories_setup
         required_infos
         firewall
-	harden_linux
+        harden_linux
         setup_jexactyl
         broadcast
         ;;
     2)  repositories_setup
         required_infos
         firewall
-	harden_linux
+        harden_linux
         ssl_certs
         install_wings
         broadcast_wings
@@ -938,7 +962,7 @@ case $installoption in
     3)  repositories_setup
         required_infos
         firewall
-	harden_linux
+        harden_linux
         setup_jexactyl
         broadcast
         install_wings
@@ -949,8 +973,8 @@ case $installoption in
     5)  upgrade_wings
         ;;
     6)  upgrade_jexactyl
-	upgrade_wings
-	;;
+        upgrade_wings
+        ;;
     7)  install_phpmyadmin
         ;;
     8)  curl -sSL https://raw.githubusercontent.com/tommytran732/MariaDB-Root-Password-Reset/master/mariadb-104.sh | sudo bash
