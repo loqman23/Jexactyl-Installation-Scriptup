@@ -1,30 +1,54 @@
-Here's the complete file content with the updated header while maintaining all other functionality:
-
 #!/bin/bash
 
 # Jexactyl Installation & Upgrade Script
-# Copyright © 2024 loqmanas
-# https://github.com/loqman23
+# Copyright © 2024 Loqman AS
+# Website: https://loqman.netlify.app
+# GitHub: https://github.com/loqman23
 
-# Color codes
-RED='\033[0;31m'
+# Color codes for terminal output
+PURPLE='\033[0;35m'
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-NC='\033[0m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Output functions
+# Output functions with improved styling
 output() {
-    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 warn() {
-    echo -e "${RED}$1${NC}"
+    echo -e "${RED}[WARNING]${NC} $1"
 }
 
 success() {
-    echo -e "${GREEN}$1${NC}"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# ASCII Art Logo
+show_logo() {
+    echo -e "${PURPLE}"
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    echo "║                                                               ║"
+    echo "║                  JEXACTYL INSTALLATION SCRIPT                 ║"
+    echo "║                     By Loqman AS © 2025                       ║"
+    echo "║                                                               ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+# Installation confirmation
+confirm_installation() {
+    echo -e "${YELLOW}"
+    echo "Would you like to proceed with the installation? [y/N]"
+    echo -e "${NC}"
+    read -r choice
+    case $choice in
+        [Yy]*)  return 0 ;;
+        *)      echo "Installation cancelled."
+                exit 1 ;;
+    esac
 }
 
 # Version variables
@@ -1171,16 +1195,14 @@ broadcast_wings() {
 
 # Main execution
 clear
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║                  JEXACTYL INSTALLATION SCRIPT                 ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+show_logo
 echo ""
 
 # Run preflight checks
 preflight
+
+# Confirm installation
+confirm_installation
 
 # Show installation options
 install_options
@@ -1227,6 +1249,7 @@ case $installoption in
 esac
 
 echo ""
-echo "Thank you for using the Jexactyl installation script!"
-echo "If you encounter any issues, please report them on the GitHub repository."
+echo -e "${PURPLE}Thank you for using Loqman's Jexactyl installation script!${NC}"
+echo -e "${BLUE}Visit https://loqman.netlify.app for more projects${NC}"
+echo -e "${BLUE}Join our Discord: https://discord.gg/7YJj6swUbv${NC}"
 echo ""
