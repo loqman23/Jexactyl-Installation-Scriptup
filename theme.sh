@@ -58,7 +58,14 @@ customize_theme() {
     cd /var/www/jexactyl || exit
     mkdir -p backup/resources
     cp -r resources/views backup/resources/
-    cp -r public/themes backup/public/
+    
+    # Create theme directories if they don't exist
+    mkdir -p public/assets/css
+    # Also back up existing theme files if they exist
+    if [ -d "public/assets/css" ]; then
+        mkdir -p backup/public/assets
+        cp -r public/assets/css backup/public/assets/
+    fi
     
     # Update admin dashboard theme
     cat > resources/views/admin/index.blade.php <<EOL
@@ -96,8 +103,8 @@ customize_theme() {
 @endsection
 EOL
 
-    # Update theme colors and styles
-    cat > public/themes/pterodactyl/css/theme.css <<EOL
+    # Update theme colors and styles - FIXED PATH
+    cat > public/assets/css/theme.css <<EOL
 :root {
     --primary: #8960DC;
     --primary-light: #9D7DE5;
@@ -365,6 +372,12 @@ body {
 EOL
 
     # Set proper permissions
+    if command -v lsb_release >/dev/null 2>&1; then
+        lsb_dist="$(lsb_release -is | tr '[:upper:]' '[:lower:]')"
+    elif [ -f /etc/os-release ]; then
+        lsb_dist="$(. /etc/os-release && echo "$ID" | tr '[:upper:]' '[:lower:]')"
+    fi
+    
     if [ "$lsb_dist" = "ubuntu" ] || [ "$lsb_dist" = "debian" ]; then
         chown -R www-data:www-data /var/www/jexactyl
     elif [ "$lsb_dist" = "fedora" ] || [ "$lsb_dist" = "centos" ] || [ "$lsb_dist" = "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
