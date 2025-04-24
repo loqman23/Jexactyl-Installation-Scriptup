@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thailand Codes Theme Customizer for Jexactyl
+# Jexactyl Theme Customizer
 # Copyright © 2024 Loqman AS
 # Website: https://loqman.netlify.app
 # GitHub: https://github.com/loqman23
@@ -31,9 +31,9 @@ show_logo() {
     echo -e "${PURPLE}"
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║                                                               ║"
-    echo "║               THAILAND CODES THEME CUSTOMIZER                 ║"
-    echo "║                     By Loqman AS © 2024                      ║"
-    echo "║                                                              ║"
+    echo "║               JEXACTYL THEME CUSTOMIZER                       ║"
+    echo "║                     By Loqman AS © 2024                       ║"
+    echo "║                                                               ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -41,7 +41,7 @@ show_logo() {
 # Theme customization confirmation
 confirm_theme_customization() {
     echo -e "${YELLOW}"
-    echo "Would you like to customize the panel theme with Thailand Codes style? [y/N]"
+    echo "Would you like to customize the panel theme? [y/N]"
     echo -e "${NC}"
     read -r choice
     case $choice in
@@ -52,7 +52,7 @@ confirm_theme_customization() {
 
 # Theme customization function
 customize_theme() {
-    output "Customizing panel theme with Thailand Codes style..."
+    output "Customizing panel theme..."
     
     # Backup original files
     cd /var/www/jexactyl || exit
@@ -60,59 +60,6 @@ customize_theme() {
     cp -r resources/views backup/resources/
     cp -r public/themes backup/public/
     
-    # Update login page
-    cat > resources/views/auth/login.blade.php <<EOL
-@extends('layouts.auth')
-@section('title', 'Login')
-
-@section('content')
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8 border border-purple-500/30">
-        <div class="text-center">
-            <img class="mx-auto h-24 w-auto" src="https://i.ibb.co/8dpsp69/Th-Logo.png" alt="Thailand Codes">
-            <h2 class="mt-6 text-3xl font-extrabold text-white">Sign in to your account</h2>
-            <p class="mt-2 text-sm text-gray-400">
-                Or <a href="{{ route('auth.register') }}" class="font-medium text-purple-500 hover:text-purple-400">create a new account</a>
-            </p>
-        </div>
-        
-        <form class="mt-8 space-y-6" method="POST" action="{{ route('auth.login') }}">
-            @csrf
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="email" class="sr-only">Email address</label>
-                    <input id="email" name="email" type="email" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 placeholder-gray-500 text-gray-100 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm bg-gray-700" placeholder="Email address">
-                </div>
-                <div>
-                    <label for="password" class="sr-only">Password</label>
-                    <input id="password" name="password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 placeholder-gray-500 text-gray-100 rounded-b-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm bg-gray-700" placeholder="Password">
-                </div>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <input id="remember" name="remember" type="checkbox" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-700 rounded bg-gray-700">
-                    <label for="remember" class="ml-2 block text-sm text-gray-400">Remember me</label>
-                </div>
-                <div class="text-sm">
-                    <a href="{{ route('auth.password') }}" class="font-medium text-purple-500 hover:text-purple-400">Forgot password?</a>
-                </div>
-            </div>
-
-            <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                    <svg class="h-5 w-5 text-purple-500 group-hover:text-purple-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
-                    </svg>
-                </span>
-                Sign in
-            </button>
-        </form>
-    </div>
-</div>
-@endsection
-EOL
-
     # Update admin dashboard theme
     cat > resources/views/admin/index.blade.php <<EOL
 @extends('layouts.admin')
@@ -149,7 +96,7 @@ EOL
 @endsection
 EOL
 
-    # Update theme colors
+    # Update theme colors and styles
     cat > public/themes/pterodactyl/css/theme.css <<EOL
 :root {
     --primary: #8960DC;
@@ -161,46 +108,259 @@ EOL
     --background-card: rgba(20, 20, 20, 0.8);
 }
 
+/* Global Styles */
 body {
     background: var(--background);
     color: #ffffff;
     font-family: 'Montserrat', sans-serif;
 }
 
+/* Navigation */
 .navbar {
     background: var(--background-card);
     border-bottom: 1px solid var(--primary);
+    box-shadow: 0 2px 10px rgba(137, 96, 220, 0.1);
 }
 
+.navbar-brand {
+    color: var(--primary) !important;
+}
+
+.navbar-nav > li > a {
+    color: #ffffff !important;
+    transition: color 0.2s;
+}
+
+.navbar-nav > li > a:hover {
+    color: var(--primary) !important;
+}
+
+/* Buttons */
 .btn-primary {
     background: var(--primary);
     border-color: var(--primary-dark);
+    transition: all 0.2s;
 }
 
 .btn-primary:hover {
     background: var(--primary-dark);
     border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(137, 96, 220, 0.2);
 }
 
+/* Cards and Panels */
 .panel {
     background: var(--background-card);
     border: 1px solid var(--primary);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .panel-heading {
     background: var(--primary);
     color: #ffffff;
+    border-radius: 7px 7px 0 0;
 }
 
+/* Forms */
 .form-control {
     background: var(--background-light);
     border: 1px solid var(--primary);
     color: #ffffff;
+    transition: all 0.2s;
 }
 
 .form-control:focus {
     border-color: var(--primary-light);
     box-shadow: 0 0 0 0.2rem rgba(137, 96, 220, 0.25);
+}
+
+/* Tables */
+.table {
+    background: var(--background-card);
+    color: #ffffff;
+}
+
+.table > thead > tr > th {
+    border-bottom: 2px solid var(--primary);
+    color: var(--primary);
+}
+
+.table > tbody > tr > td {
+    border-top: 1px solid rgba(137, 96, 220, 0.1);
+}
+
+/* Sidebar */
+.sidebar {
+    background: var(--background-card);
+    border-right: 1px solid var(--primary);
+}
+
+.sidebar-menu > li > a {
+    color: #ffffff;
+    transition: all 0.2s;
+}
+
+.sidebar-menu > li > a:hover {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+/* Console */
+.terminal {
+    background: var(--background);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    font-family: 'Fira Code', monospace;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 8px;
+    border: none;
+}
+
+.alert-success {
+    background: rgba(40, 167, 69, 0.2);
+    border: 1px solid #28a745;
+    color: #28a745;
+}
+
+.alert-danger {
+    background: rgba(220, 53, 69, 0.2);
+    border: 1px solid #dc3545;
+    color: #dc3545;
+}
+
+/* Progress Bars */
+.progress {
+    background: var(--background-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: var(--primary);
+    transition: width 0.3s ease;
+}
+
+/* Modals */
+.modal-content {
+    background: var(--background-card);
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--primary);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--primary);
+}
+
+/* Tooltips */
+.tooltip-inner {
+    background: var(--primary);
+    border-radius: 4px;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(137, 96, 220, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(137, 96, 220, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(137, 96, 220, 0);
+    }
+}
+
+/* Custom Components */
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-indicator.online {
+    background: #28a745;
+    box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+}
+
+.status-indicator.offline {
+    background: #dc3545;
+    box-shadow: 0 0 8px rgba(220, 53, 69, 0.4);
+}
+
+/* Server Cards */
+.server-card {
+    background: var(--background-card);
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s;
+}
+
+.server-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(137, 96, 220, 0.2);
+}
+
+/* Statistics Widgets */
+.stat-widget {
+    background: linear-gradient(45deg, var(--primary-dark), var(--primary));
+    border-radius: 12px;
+    padding: 20px;
+    color: #ffffff;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.stat-widget:hover {
+    transform: scale(1.02);
+}
+
+.stat-widget .value {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+/* Loading Spinners */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--primary);
+    border-top: 4px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 10px;
+    }
+    
+    .server-card {
+        margin: 10px;
+    }
+    
+    .stat-widget {
+        margin-bottom: 15px;
+    }
 }
 EOL
 
@@ -212,7 +372,11 @@ EOL
     fi
 
     success "Theme customization completed successfully!"
-    output "Your panel now has the Thailand Codes theme applied."
+    output "Your panel now has a beautiful custom theme applied."
+    
+    # Restart services to apply changes
+    systemctl restart nginx
+    systemctl restart php*-fpm
 }
 
 # Main execution
