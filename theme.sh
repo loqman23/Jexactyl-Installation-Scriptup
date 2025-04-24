@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Jexactyl Theme Customizer
+# Jexactyl Custom Theme Installer
 # Copyright © 2024 Loqman AS
 # Website: https://loqman.netlify.app
 # GitHub: https://github.com/loqman23
@@ -38,10 +38,28 @@ show_logo() {
     echo -e "${NC}"
 }
 
+# Detect OS distribution for setting proper permissions
+detect_distro() {
+    if command -v lsb_release >/dev/null 2>&1; then
+        lsb_dist="$(lsb_release -is | tr '[:upper:]' '[:lower:]')"
+    elif [ -f /etc/os-release ]; then
+        lsb_dist="$(. /etc/os-release && echo "$ID" | tr '[:upper:]' '[:lower:]')"
+    fi
+    
+    if [ "$lsb_dist" = "ubuntu" ] || [ "$lsb_dist" = "debian" ]; then
+        WEB_USER="www-data"
+    elif [ "$lsb_dist" = "fedora" ] || [ "$lsb_dist" = "centos" ] || [ "$lsb_dist" = "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
+        WEB_USER="nginx"
+    else
+        # Default to www-data if can't determine
+        WEB_USER="www-data"
+    fi
+}
+
 # Theme customization confirmation
 confirm_theme_customization() {
     echo -e "${YELLOW}"
-    echo "Would you like to customize the panel theme? [y/N]"
+    echo "Would you like to install the custom theme for Jexactyl? [y/N]"
     echo -e "${NC}"
     read -r choice
     case $choice in
@@ -52,59 +70,27 @@ confirm_theme_customization() {
 
 # Theme customization function
 customize_theme() {
-    output "Customizing panel theme..."
+    output "Installing custom theme for Jexactyl..."
     
-    # Backup original files
-    cd /var/www/jexactyl || exit
-    mkdir -p backup/resources
-    cp -r resources/views backup/resources/
+    # Navigate to Jexactyl directory
+    cd /var/www/jexactyl || { warn "Jexactyl directory not found!"; exit 1; }
     
-    # Create theme directories if they don't exist
-    mkdir -p public/assets/css
-    # Also back up existing theme files if they exist
-    if [ -d "public/assets/css" ]; then
-        mkdir -p backup/public/assets
-        cp -r public/assets/css backup/public/assets/
+    # Backup original theme files
+    output "Creating backup of original theme files..."
+    TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+    mkdir -p backup/themes-$TIMESTAMP
+    
+    if [ -d "public/themes" ]; then
+        cp -r public/themes backup/themes-$TIMESTAMP/
     fi
     
-    # Update admin dashboard theme
-    cat > resources/views/admin/index.blade.php <<EOL
-@extends('layouts.admin')
-@section('title', 'Admin Dashboard')
-
-@section('content-header')
-    <h1>Administrative Dashboard<small>A quick overview of your system.</small></h1>
-    <ol class="breadcrumb">
-        <li><a href="{{ route('admin.index') }}">Admin</a></li>
-        <li class="active">Dashboard</li>
-    </ol>
-@endsection
-
-@section('content')
-<div class="row">
-    <div class="col-xs-12">
-        <div class="box box-info">
-            <div class="box-header with-border">
-                <h3 class="box-title">System Information</h3>
-            </div>
-            <div class="box-body">
-                <div class="row">
-                    @include('admin.statistics')
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-@endsection
-
-@section('footer-scripts')
-    @parent
-    {!! Theme::js('js/admin/dashboard.js') !!}
-@endsection
-EOL
-
-    # Update theme colors and styles - FIXED PATH
-    cat > public/assets/css/theme.css <<EOL
+    # Create custom theme directory
+    output "Creating custom theme directory..."
+    mkdir -p public/themes/custom/css
+    
+    # Create the custom CSS file
+    output "Creating custom theme CSS file..."
+    cat > public/themes/custom/css/custom.css <<EOL
 :root {
     --primary: #8960DC;
     --primary-light: #9D7DE5;
@@ -371,25 +357,180 @@ body {
 }
 EOL
 
-    # Set proper permissions
-    if command -v lsb_release >/dev/null 2>&1; then
-        lsb_dist="$(lsb_release -is | tr '[:upper:]' '[:lower:]')"
-    elif [ -f /etc/os-release ]; then
-        lsb_dist="$(. /etc/os-release && echo "$ID" | tr '[:upper:]' '[:lower:]')"
-    fi
-    
-    if [ "$lsb_dist" = "ubuntu" ] || [ "$lsb_dist" = "debian" ]; then
-        chown -R www-data:www-data /var/www/jexactyl
-    elif [ "$lsb_dist" = "fedora" ] || [ "$lsb_dist" = "centos" ] || [ "$lsb_dist" = "rhel" ] || [ "$lsb_dist" = "rocky" ] || [ "$lsb_dist" = "almalinux" ]; then
-        chown -R nginx:nginx /var/www/jexactyl
+    # Create theme configuration file
+    output "Creating theme configuration file..."
+    cat > public/themes/custom/theme.json <<EOL
+{
+  "name": "Custom Purple Theme",
+  "version": "1.0.0",
+  "author": "Loqman AS",
+  "css": [
+    "css/custom.css"
+  ]
+}
+EOL
+
+    # Check if theme.json exists in parent directory, create if needed
+    if [ ! -f "public/themes/theme.json" ]; then
+        output "Creating global theme configuration..."
+        cat > public/themes/theme.json <<EOL
+{
+  "themes": [
+    "custom",
+    "default",
+    "dark",
+    "light",
+    "blue",
+    "minecraft",
+    "jexactyl"
+  ],
+  "active": "custom"
+}
+EOL
+    else
+        # Update existing theme.json to include custom theme and set as active
+        output "Updating global theme configuration..."
+        # Create a temporary file with jq if available
+        if command -v jq >/dev/null 2>&1; then
+            jq '.themes |= if index("custom") then . else . + ["custom"] end | .active = "custom"' public/themes/theme.json > public/themes/theme.json.tmp
+            mv public/themes/theme.json.tmp public/themes/theme.json
+        else
+            # Basic replacement if jq is not available
+            sed -i 's/"active": "[^"]*"/"active": "custom"/g' public/themes/theme.json
+            # Check if custom is already in themes list
+            if ! grep -q '"custom"' public/themes/theme.json; then
+                # Add custom to themes array - this is a basic approach that might need manual adjustment
+                sed -i 's/"themes": \[/"themes": \["custom", /g' public/themes/theme.json
+            fi
+        fi
     fi
 
-    success "Theme customization completed successfully!"
-    output "Your panel now has a beautiful custom theme applied."
+    # Make custom theme active in settings if database config exists
+    if command -v mysql >/dev/null 2>&1; then
+        output "Do you want to update the database to set custom theme as default? [y/N]"
+        read -r db_choice
+        if [[ "$db_choice" =~ ^[Yy]$ ]]; then
+            output "Enter MySQL/MariaDB username (default: pterodactyl):"
+            read -r db_user
+            db_user=${db_user:-pterodactyl}
+            
+            output "Enter MySQL/MariaDB password:"
+            read -rs db_pass
+            
+            output "Enter MySQL/MariaDB database name (default: panel):"
+            read -r db_name
+            db_name=${db_name:-panel}
+            
+            output "Updating theme setting in database..."
+            mysql -u"$db_user" -p"$db_pass" "$db_name" -e "UPDATE settings SET value = 'custom' WHERE `key` = 'theme:active';"
+            
+            if [ $? -eq 0 ]; then
+                success "Database updated successfully!"
+            else
+                warn "Failed to update database. You'll need to set the theme manually from admin panel."
+            fi
+        else
+            output "Skipping database update. You can set the theme from admin panel."
+        fi
+    fi
+
+    # Update admin dashboard theme
+    output "Updating admin dashboard layout..."
+    if [ -f "resources/views/admin/index.blade.php" ]; then
+        cp -f resources/views/admin/index.blade.php resources/views/admin/index.blade.php.bak
+        cat > resources/views/admin/index.blade.php <<EOL
+@extends('layouts.admin')
+@section('title', 'Admin Dashboard')
+
+@section('content-header')
+    <h1>Administrative Dashboard<small>A quick overview of your system.</small></h1>
+    <ol class="breadcrumb">
+        <li><a href="{{ route('admin.index') }}">Admin</a></li>
+        <li class="active">Dashboard</li>
+    </ol>
+@endsection
+
+@section('content')
+<div class="row">
+    <div class="col-xs-12">
+        <div class="box box-info">
+            <div class="box-header with-border">
+                <h3 class="box-title">System Information</h3>
+            </div>
+            <div class="box-body">
+                <div class="row">
+                    @include('admin.statistics')
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('footer-scripts')
+    @parent
+    {!! Theme::js('js/admin/dashboard.js') !!}
+@endsection
+EOL
+    fi
+
+    # Create a HTML test file to verify theme is working
+    output "Creating test HTML file..."
+    cat > public/themes/custom/test.html <<EOL
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Theme Test</title>
+    <link rel="stylesheet" href="css/custom.css">
+</head>
+<body>
+    <div style="text-align: center; padding: 50px;">
+        <h1 style="color: var(--primary);">Custom Theme Test</h1>
+        <p>If you're seeing this page styled with purple colors, your theme installation was successful!</p>
+        <button class="btn-primary" style="padding: 10px 20px; border-radius: 5px; cursor: pointer;">Test Button</button>
+    </div>
+</body>
+</html>
+EOL
+
+    # Set proper permissions
+    output "Setting proper permissions..."
+    detect_distro
+    chown -R $WEB_USER:$WEB_USER /var/www/jexactyl/public/themes/custom
+    chmod -R 755 /var/www/jexactyl/public/themes/custom
     
-    # Restart services to apply changes
-    systemctl restart nginx
-    systemctl restart php*-fpm
+    # Clear Laravel cache
+    output "Clearing application cache..."
+    php artisan cache:clear
+    php artisan view:clear
+    php artisan config:clear
+    
+    # Restart services
+    output "Restarting web services..."
+    if systemctl is-active --quiet nginx; then
+        systemctl restart nginx
+    fi
+    
+    # Restart PHP-FPM (handling different versions)
+    php_service=$(find /etc/init.d -name "php*-fpm" | head -n 1 | sed 's/\/etc\/init.d\///')
+    if [ -n "$php_service" ]; then
+        systemctl restart $php_service
+    else
+        # Try common PHP-FPM service names
+        for ver in 8.2 8.1 8.0 7.4 7.3 7.2; do
+            if systemctl is-active --quiet php$ver-fpm; then
+                systemctl restart php$ver-fpm
+            fi
+        done
+    fi
+
+    success "Theme installation completed successfully!"
+    output "Your Jexactyl panel now has a beautiful custom purple theme applied."
+    output "You can test the theme by visiting: http://your-panel-url/themes/custom/test.html"
+    output "If the theme isn't applied, please visit the admin panel to manually set 'custom' as your active theme."
+    output "Or access the theme directly at: http://your-panel-url/themes/custom/css/custom.css"
 }
 
 # Main execution
